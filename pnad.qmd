@@ -1,0 +1,247 @@
+---
+title: "Pnad Contínua"
+subtitle: ""
+author: "Eliana Cardoso Gonçalves"
+date: "09/02/2025" # Data atual
+date-format: short # formatação dd/mm/aaaa
+lang: pt # linguagem
+toc: true # índice
+number-sections: true
+fig-cap-location: top # localização do título da figura 
+geometry:
+  - top=3cm
+  - left=3cm
+  - right=2cm
+  - bottom=2cm
+tbl-cap-location: top
+df-print: kable # saída dos data frames serem kable
+fig-width: 10
+fig-height: 4
+format: 
+  html:
+    self-contained: true # tornar o HTML autocontido
+    theme: flatly
+  pdf: 
+    documentclass: scrreprt
+  docx: default
+editor: 
+  markdown: 
+    wrap: 72
+editor_options:
+  chunk_output_type: console
+output: 
+  pdf_document:
+    margin: 1in
+    df_print:
+      digits: 3
+  word_document:
+    fig_caption: true
+    df_print: kable
+prefer-html: true
+execute:
+  echo: true
+  warning: false
+---
+
+```{css, echo= FALSE}
+body {
+  text-align: justify;
+}
+
+```
+
+
+## Introdução 
+
+A Pesquisa Nacional por Amostra de Domicílios Contínua (PNAD Contínua) investiga, trimestralmente, um conjunto de informações conjunturais sobre as tendências e flutuações da força de trabalho e, de forma anual, temas estruturais relevantes para a compreensão da realidade brasileira. Por se tratar de uma amostra, os dados não estão prontos para uso imediato, pois a PNAD Contínua utiliza uma amostragem probabilística complexa, realizada em várias etapas. Cada indivíduo possui um peso amostral, que indica quantas pessoas na população ele representa, além de estar associado a estratos e conglomerados.
+
+Por isso, este relatório tem como objetivo facilitar a extração dos dados e orientar sobre como realizar análises corretas, garantindo que os resultados sejam representativos da população brasileira.
+
+
+
+## Extração
+
+O IBGE criou um pacote no R chamado `PNADcIBGE`, que permite acessar todos os microdados da PNAD Contínua de forma rápida e fácil.
+  
+```{r}
+# Instalação dos pacotes (caso ainda não estejam instalados)
+#install.packages("PNADcIBGE")
+# Carregando os pacotes
+library(PNADcIBGE)
+```
+  
+  
+  
+Depois de instalado e carregado o pacote, podemos chamar a função get_pnadc, que baixa os microdados da PNAD Contínua diretamente para o R.
+
+
+```{r}
+variaveis <- c("VD4009", "VD4012", "V4013", "V2009", "VD4037", 
+  "VD4016", "VD4017", "VD4019", "VD4020", 
+  "VD3004", "V2010", "V2007", "V4010"
+
+
+  
+  
+)
+
+pnad_cont <- get_pnadc(year = 2025, quarter = 2,vars=variaveis, design = TRUE)
+```
+
+
+
+A função get_pnadc permite extrair os dados selecionando o ano e o trimestre de interesse. É possível extrair todas as variáveis, deixando de fora o argumento vars, ou selecionar apenas as variáveis desejadas, especificando-as nesse parâmetro.
+
+Se o argumento design não for utilizado, as análises realizadas — como médias, proporções e totais — serão apenas simples médias da amostra. Isso pode gerar resultados enviesados, ou seja, que não representam corretamente a população brasileira.
+
+O design amostral é o objeto criado quando definimos design = TRUE. Ele faz com que o R compreenda como a amostra foi coletada, incorporando as informações necessárias para análises corretas. Entre essas informações estão os pesos amostrais, que indicam quantas pessoas cada indivíduo da amostra representa; a estratificação, que garante a representatividade de diferentes regiões, sexo, idade e outros recortes; e os conglomerados, que agrupam algumas unidades, como domicílios, e precisam ser considerados nas estimativas.
+
+
+
+## Análise dos dados 
+
+
+Antes de iniciar as análises, também iremos baixar e carregar o pacote survey no R. Esse pacote é fundamental para trabalhar com dados de pesquisas amostrais complexas, como a PNAD Contínua. Ele permite realizar análises que consideram pesos amostrais, estratificação e conglomerados, garantindo que médias, proporções, totais e intervalos de confiança sejam representativos da população.
+
+Quando combinamos o pacote PNADcIBGE com o survey, é possível criar um objeto de desenho amostral (survey.design) usando o argumento design = TRUE na função get_pnadc. Dessa forma, todas as análises subsequentes no R levam em conta a complexidade da amostra, evitando resultados enviesados.
+
+
+Além do pacote survey, existe também o pacote srvyr, que facilita o trabalho com pesquisas amostrais complexas no R. Enquanto o survey utiliza uma sintaxe própria, o srvyr integra os recursos do survey com a gramática do dplyr, tornando a escrita do código mais simples e intuitiva. Dessa forma, é possível aplicar funções como summarise, mutate e group_by diretamente em objetos de desenho amostral, sem perder a correção estatística garantida pelo uso dos pesos, estratos e conglomerados.
+
+
+```{r}
+
+#install.packages("survey")
+#install.packages("srvyr")
+
+
+library(survey)
+library(srvyr)
+```
+
+
+Suponhamos que desejamos calcular a média salarial no Brasil considerando o gênero (mulheres e homens) e a raça.
+
+O primeiro passo é converter o objeto de dados, que normalmente é um data.frame ou tibble contendo as informações da PNAD Contínua, em um objeto de desenho amostral compatível com o pacote srvyr. Isso é importante para que todos os cálculos considerem os pesos, estratos e conglomerados da pesquisa, garantindo que os resultados sejam representativos da população brasileira.
+
+```{r}
+# Converter os dados para desenho amostral com srvyr
+
+pnad_cont <- as_survey(pnad_cont)
+```
+
+
+
+O código abaixo calcula a média salarial por sexo (V2007) e raca (V2010) a partir do objeto pnad_cont, que já está convertido em desenho amostral com o pacote srvyr:
+
+Lembrando que o dicionário das variáveis da PNAD Contínua está disponível no site do IBGE. Nele é possível consultar o significado de cada código, as categorias das variáveis e informações detalhadas sobre como foram coletadas. Isso é essencial para interpretar corretamente os microdados e garantir que as análises sejam precisas.
+
+Site do IBGE: https://www.ibge.gov.br/estatisticas/sociais/trabalho/9173-pnad-continua.html
+
+
+
+Variáveis contínuas → survey_mean() calcula a média ponderada.
+
+```{r}
+
+salario <- pnad_cont %>%
+    filter(!is.na(VD4020)) %>%    # Remove observações sem renda
+    group_by( V2007, V2010) %>%      # Agrupa por raca e sexo
+    summarise(salario_medio = survey_mean(VD4020, na.rm = TRUE), .groups = "drop")
+
+salario
+```
+
+
+
+
+Depois de calcular a média salarial por sexo e raca, você já pode visualizar os resultados ou fazer qualquer tipo de análise que desejar. Por exemplo:
+
+
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Supondo que 'salario' já está criado como antes
+
+# Criar um gráfico de barras comparando média salarial por raça e sexo
+ggplot(salario, aes(x = factor(V2010), y = salario_medio, fill = factor(V2007))) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Média Salarial por sexo e cor",
+    x = "Raça/Cor",
+    y = "Salário Médio (R$)",
+    fill = "Sexo"
+  ) +
+  theme_minimal()
+
+
+```
+
+Agora, considerando apenas variáveis categóricas, utilizaremos a função survey_prop() para calcular proporções ou quantidades.
+
+Suponhamos que queremos calcular a porcentagem de pessoas por nível de escolaridade, considerando o sexo.
+
+
+```{r}
+  
+ 
+escolaridade_sexo  = pnad_cont %>%   # Remove observações sem renda
+    group_by( V2007, VD3004) %>%      # Agrupa por raca e sexo
+    summarise(contagem = survey_total( na.rm = TRUE), .groups = "drop")
+escolaridade_sexo 
+  
+```
+
+  
+  
+E o gráfico:
+
+
+
+```{r}
+escolaridade_sexo <- escolaridade_sexo %>%
+  mutate(
+    escola = factor(VD3004,
+                    levels = c(
+                      "Sem instrução e menos de 1 ano de estudo",
+                      "Fundamental incompleto ou equivalente",
+                      "Fundamental completo ou equivalente",
+                      "Médio incompleto ou equivalente",
+                      "Médio completo ou equivalente",
+                      "Superior incompleto ou equivalente",
+                      "Superior completo"
+                    ),
+                    labels = c(
+                      "Sem instrução",
+                      "Fundamental incompleto",
+                      "Fundamental completo",
+                      "Médio incompleto",
+                      "Médio completo",
+                      "Superior incompleto",
+                      "Superior completo"
+                    ))
+  )
+
+
+# Gráfico final
+ggplot(escolaridade_sexo, aes(x = escola, y = contagem, fill = V2007)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Quantidade de Pessoas por Escolaridade e Sexo",
+    x = "Escolaridade",
+    y = "Quantidade",
+    fill = "Sexo"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+  
